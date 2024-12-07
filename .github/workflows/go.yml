@@ -1,43 +1,50 @@
-# Название рабочего процесса
 name: Go
 
-# Условие запуска
 on:
-  # Запуск по событию "push" (заливка изменений в ветку)
   push:
-    # Указывает, что нужно запускать рабочий процесс, только если событие относится к ветке main
-    branches: [ "main" ]
-  # Запуск по событию "pull_request". Поле "types" не указано, поэтому учитываются события по открытию, переоткрытию пул-реквеста и изменению в ветке.
-  pull_request:
-    # Указывает, что нужно запускать рабочий процесс, только если событие относится к ветке main
-    branches: [ "main" ]
+    branches: ["main"]
 
-# Задания
 jobs:
-  # Задание с идентификатором "build"
+
   build:
-    # Для запуска задания используется раннер "ubuntu-latest", что соответствует последней версии Ubuntu
     runs-on: ubuntu-latest
-
-    # Шаги задания
     steps:
-    # Первый шаг использует действие "actions/checkout@v3", которое извлекает репозиторий для дальнейшей работы с ним
     - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
 
-    # Шаг с именем "Set up Go"
-    - name: Set up Go
-      # Этот шаг использует действие "actions/setup-go@v4", которое установит Go в систему
-      uses: actions/setup-go@v4
-      # Для этого действия можно задать версию Go, которую надо установить
-      with:
-        go-version: '1.20'
-
-    # Шаг с именем "Build"
     - name: Build
-      # Этот шаг просто выполняет команду 'go build -v ./...'
       run: go build -v ./...
 
-    # Шаг с именем "Test"
+  tests:
+    # Задание "tests" зависит от задания "build" и будет выполнено после него
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+
     - name: Test
-      # Этот шаг выполняет команду 'go test -v ./...'
       run: go test -v ./...
+
+  # Задание проверяет наличие в коде состояния гонки
+  tests-race:
+    # Задание "tests-race" зависит от задания "build" и будет выполнено после него
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-go@v4
+
+    - name: Test
+      run: go test -race -v ./...
+  
+  # Задание проверяет код на соответствие стилю и отсутствие логических ошибок
+  lint:
+    # Задание "lint" зависит от заданий "tests" и "tests-race" и будет выполнено после них
+    needs: [tests, tests-race]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+      # Используется действие "golangci/golangci-lint-action@v3", которое запускает линтер. Он проверит код на соответствие стилю и отсутствие логических ошибок
+      - uses: golangci/golangci-lint-action@v3
